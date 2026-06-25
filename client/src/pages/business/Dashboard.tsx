@@ -17,7 +17,7 @@ export default function BusinessDashboard() {
         <AlertCircle className="w-10 h-10 text-amber-500 mx-auto mb-3" />
         <h3 className="font-serif text-xl font-semibold text-foreground mb-2">No Business Profile</h3>
         <p className="text-muted-foreground mb-6">Register your business to get started.</p>
-        <Button className="rounded-full" onClick={() => navigate("/onboarding/business")}>Register Business</Button>
+        <Button asChild className="rounded-full"><a href="https://magicfishbowl.com/enroll" target="_blank" rel="noopener noreferrer">Enroll on MagicFishbowl</a></Button>
       </div>
     </AppLayout>
   );

@@ -63,3 +63,15 @@
 - [x] Loading states and error handling throughout
 - [x] Vitest unit tests for routers (15 tests passing)
 - [x] Final checkpoint and delivery
+
+## Refocus: Consumer-First + MagicFishbowl Business Onboarding
+- [x] Redesign landing page as consumer-first hero (big CTA: "Get Your Free Rewards Card")
+- [x] Add "For Businesses" teaser section on landing page linking to magicfishbowl.com
+- [x] Create a /for-businesses page explaining the program and redirecting to magicfishbowl.com onboarding
+- [x] Remove "I'm a Business" card from onboarding role-selection screen (replaced with MagicFishbowl redirect)
+- [x] Remove /onboarding/business route and BusinessOnboarding page from consumer flow
+- [x] Remove business self-registration form from the platform
+- [x] Update App.tsx routing to remove business onboarding paths
+- [x] Ensure consumer onboarding flows directly to /dashboard after role selection
+- [x] Update nav/header to surface consumer features prominently
+- [ ] Push updated code to GitHub

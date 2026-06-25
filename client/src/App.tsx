@@ -14,7 +14,7 @@ import BusinessDirectory from "./pages/BusinessDirectory";
 
 // Onboarding
 import Onboarding from "./pages/Onboarding";
-import BusinessOnboarding from "./pages/BusinessOnboarding";
+import ForBusinesses from "./pages/ForBusinesses";
 
 // Consumer pages
 import ConsumerDashboard from "./pages/consumer/Dashboard";
@@ -80,9 +80,11 @@ function Router() {
       <Route path="/" component={Home} />
       <Route path="/directory" component={BusinessDirectory} />
 
-      {/* Onboarding — authenticated but role-agnostic */}
+      {/* Onboarding — consumer path only; business owners are redirected to magicfishbowl.com */}
       <Route path="/onboarding" component={Onboarding} />
-      <Route path="/onboarding/business" component={BusinessOnboarding} />
+
+      {/* Public business info page */}
+      <Route path="/for-businesses" component={ForBusinesses} />
 
       {/* Consumer — only accessible to consumers */}
       <Route path="/dashboard">
