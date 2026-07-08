@@ -9,6 +9,7 @@ import { useEffect } from "react";
 
 // Public pages
 import Home from "./pages/Home";
+import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
 import BusinessDirectory from "./pages/BusinessDirectory";
 
@@ -78,6 +79,7 @@ function Router() {
     <Switch>
       {/* Public */}
       <Route path="/" component={Home} />
+      <Route path="/login" component={Login} />
       <Route path="/directory" component={BusinessDirectory} />
 
       {/* Onboarding — consumer path only; business owners are redirected to magicfishbowl.com */}
