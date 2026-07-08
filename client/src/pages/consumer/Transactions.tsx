@@ -12,7 +12,7 @@ const TX_ICONS: Record<string, React.ReactNode> = {
   redeem: <Gift className="w-5 h-5 text-primary" />,
   bonus: <Star className="w-5 h-5 text-amber-500" />,
   expire: <Clock className="w-5 h-5 text-muted-foreground" />,
-  adjust: <ArrowDownCircle className="w-5 h-5 text-orange-400" />,
+  adjustment: <ArrowDownCircle className="w-5 h-5 text-orange-400" />,
 };
 
 const TX_COLORS: Record<string, string> = {
@@ -20,27 +20,25 @@ const TX_COLORS: Record<string, string> = {
   bonus: "text-amber-600",
   redeem: "text-primary",
   expire: "text-muted-foreground",
-  adjust: "text-orange-500",
+  adjustment: "text-orange-500",
 };
 
 export default function ConsumerTransactions() {
-  const { data: cards, isLoading: cardsLoading } = trpc.consumer.getMyCards.useQuery();
-  const [selectedCardId, setSelectedCardId] = useState<string>("all");
+  const { data: accounts, isLoading: accountsLoading } = trpc.consumer.getMyCards.useQuery();
+  const [selectedAccountId, setSelectedAccountId] = useState<string>("");
 
-  const cardOptions = useMemo(() => cards?.map(({ card, business }) => ({
-    id: card.id,
-    label: business?.name ?? `Card #${card.id}`,
-  })) ?? [], [cards]);
+  const accountOptions = useMemo(() => accounts?.map(a => ({
+    id: a.id,
+    label: a.merchant?.businessName ?? "Account",
+  })) ?? [], [accounts]);
 
-  // Aggregate transactions across all cards or a specific one
-  const firstCardId = cards?.[0]?.card.id;
-  const resolvedCardId = selectedCardId !== "all" ? parseInt(selectedCardId) : firstCardId;
+  const resolvedAccountId = selectedAccountId || accounts?.[0]?.id;
   const { data: txData, isLoading: txLoading } = trpc.consumer.getTransactions.useQuery(
-    { cardId: resolvedCardId ?? 0 },
-    { enabled: !cardsLoading && !!resolvedCardId }
+    { loyaltyAccountId: resolvedAccountId ?? "" },
+    { enabled: !accountsLoading && !!resolvedAccountId }
   );
 
-  const isLoading = cardsLoading || txLoading;
+  const isLoading = accountsLoading || txLoading;
 
   return (
     <AppLayout title="Transaction History">
@@ -49,20 +47,20 @@ export default function ConsumerTransactions() {
         <p className="text-muted-foreground">A full record of your points earned and redeemed.</p>
       </div>
 
-      {/* Filter */}
-      <div className="flex items-center gap-3 mb-6">
-        <Select value={selectedCardId} onValueChange={setSelectedCardId}>
-          <SelectTrigger className="w-56 rounded-xl h-10">
-            <SelectValue placeholder="All businesses" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Businesses</SelectItem>
-            {cardOptions.map(c => (
-              <SelectItem key={c.id} value={String(c.id)}>{c.label}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
+      {accountOptions.length > 0 && (
+        <div className="flex items-center gap-3 mb-6">
+          <Select value={resolvedAccountId ?? ""} onValueChange={setSelectedAccountId}>
+            <SelectTrigger className="w-56 rounded-xl h-10">
+              <SelectValue placeholder="Select a business" />
+            </SelectTrigger>
+            <SelectContent>
+              {accountOptions.map(a => (
+                <SelectItem key={a.id} value={a.id}>{a.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
 
       {isLoading ? (
         <div className="space-y-3">{[1,2,3,4,5].map(i => <Skeleton key={i} className="h-16 rounded-2xl" />)}</div>
@@ -80,7 +78,6 @@ export default function ConsumerTransactions() {
               <div className="flex-1 min-w-0">
                 <div className="font-medium text-sm text-foreground">{tx.description ?? tx.type.charAt(0).toUpperCase() + tx.type.slice(1)}</div>
                 <div className="text-xs text-muted-foreground mt-0.5">
-                  {tx.businessId && <span className="mr-2">Business #{tx.businessId}</span>}
                   {new Date(tx.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
                 </div>
               </div>

@@ -1,7 +1,17 @@
 import type { Request } from "express";
-import type { User } from "../../drizzle/schema";
+import type { Member, Merchant } from "../../drizzle/schema";
 import * as db from "../db";
+import { ENV } from "./env";
 import { supabaseAdmin } from "./supabaseAdmin";
+
+export type AuthenticatedUser = {
+  authId: string;
+  email: string | null;
+  name: string | null;
+  role: "consumer" | "business_owner" | "admin" | "unregistered";
+  member: Member | null;
+  merchant: Merchant | null;
+};
 
 function getBearerToken(req: Request): string | null {
   const header = req.headers.authorization;
@@ -11,34 +21,34 @@ function getBearerToken(req: Request): string | null {
   return null;
 }
 
-export async function authenticateRequest(req: Request): Promise<User> {
+export async function authenticateRequest(req: Request): Promise<AuthenticatedUser> {
   const token = getBearerToken(req);
   if (!token) throw new Error("Missing session token");
 
   const { data, error } = await supabaseAdmin.auth.getUser(token);
   if (error || !data.user) throw new Error("Invalid or expired session");
 
-  const openId = data.user.id;
+  const authId = data.user.id;
   const email = data.user.email ?? null;
-  const name =
-    (data.user.user_metadata?.name as string | undefined) ??
-    email?.split("@")[0] ??
-    null;
+  const name = (data.user.user_metadata?.full_name as string | undefined) ?? email?.split("@")[0] ?? null;
 
-  let user = await db.getUserByOpenId(openId);
-  if (!user) {
-    await db.upsertUser({
-      openId,
-      email,
-      name,
-      loginMethod: "email",
-      lastSignedIn: new Date(),
-    });
-    user = await db.getUserByOpenId(openId);
-  } else {
-    await db.upsertUser({ openId, lastSignedIn: new Date() });
+  const [merchant, member] = await Promise.all([
+    db.getMerchantByOwnerId(authId),
+    db.getMemberByUserId(authId),
+  ]);
+
+  if (email && ENV.ownerEmail && email === ENV.ownerEmail) {
+    await db.grantPlatformAdmin(authId);
   }
+  const isAdmin = await db.isPlatformAdmin(authId);
 
-  if (!user) throw new Error("Failed to sync user record");
-  return user;
+  const role: AuthenticatedUser["role"] = isAdmin
+    ? "admin"
+    : merchant
+      ? "business_owner"
+      : member
+        ? "consumer"
+        : "unregistered";
+
+  return { authId, email, name, role, member: member ?? null, merchant: merchant ?? null };
 }

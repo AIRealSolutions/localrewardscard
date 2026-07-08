@@ -12,7 +12,7 @@ import { trpc } from "@/lib/trpc";
 import { getLoginUrl } from "@/const";
 import { useLocation } from "wouter";
 import {
-  Star, LayoutDashboard, Store, Users, Gift, MessageSquare, Settings,
+  Star, LayoutDashboard, Store,
   LogOut, ChevronRight, Menu, X, Shield, BarChart3, CreditCard, Compass, Award
 } from "lucide-react";
 import { useState } from "react";
@@ -31,20 +31,9 @@ const consumerNav: NavItem[] = [
   { label: "My Redemptions", href: "/redemptions", icon: <Award className="w-4 h-4" /> },
 ];
 
-const businessNav: NavItem[] = [
-  { label: "Dashboard", href: "/business", icon: <LayoutDashboard className="w-4 h-4" /> },
-  { label: "Customers", href: "/business/customers", icon: <Users className="w-4 h-4" /> },
-  { label: "Offers & Rewards", href: "/business/offers", icon: <Gift className="w-4 h-4" /> },
-  { label: "Issue Points", href: "/business/rewards", icon: <CreditCard className="w-4 h-4" /> },
-  { label: "Milestones", href: "/business/milestones", icon: <Award className="w-4 h-4" /> },
-  { label: "Campaigns", href: "/business/campaigns", icon: <MessageSquare className="w-4 h-4" /> },
-  { label: "Settings", href: "/business/settings", icon: <Settings className="w-4 h-4" /> },
-];
-
 const adminNav: NavItem[] = [
   { label: "Overview", href: "/admin", icon: <BarChart3 className="w-4 h-4" /> },
-  { label: "Businesses", href: "/admin/businesses", icon: <Store className="w-4 h-4" /> },
-  { label: "Users", href: "/admin/users", icon: <Users className="w-4 h-4" /> },
+  { label: "Merchants", href: "/admin/businesses", icon: <Store className="w-4 h-4" /> },
 ];
 
 interface AppLayoutProps {
@@ -74,15 +63,8 @@ export default function AppLayout({ children, title }: AppLayoutProps) {
     );
   }
 
-  const navItems =
-    user.role === "admin" ? adminNav :
-    user.role === "business_owner" ? businessNav :
-    consumerNav;
-
-  const roleLabel =
-    user.role === "admin" ? "Admin" :
-    user.role === "business_owner" ? "Business" :
-    "Member";
+  const navItems = user.role === "admin" ? adminNav : consumerNav;
+  const roleLabel = user.role === "admin" ? "Admin" : "Member";
 
   const initials = (user.name ?? user.email ?? "U").split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2);
 
@@ -148,11 +130,6 @@ export default function AppLayout({ children, title }: AppLayoutProps) {
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48">
-              {user.role === "business_owner" && (
-                <DropdownMenuItem onClick={() => navigate("/business/settings")}>
-                  <Settings className="w-4 h-4 mr-2" /> Settings
-                </DropdownMenuItem>
-              )}
               {user.role === "admin" && (
                 <DropdownMenuItem onClick={() => navigate("/admin")}>
                   <Shield className="w-4 h-4 mr-2" /> Admin Panel

@@ -2,36 +2,28 @@ import { and, desc, eq, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import {
-  AccrualRule,
-  Business,
-  Campaign,
-  InsertAccrualRule,
-  InsertBusiness,
-  InsertCampaign,
-  InsertLoyaltyCard,
+  InsertLoyaltyAccount,
+  InsertMerchantAccrualRule,
   InsertPatronageMilestone,
-  InsertRedemption,
-  InsertRewardsOffer,
-  InsertTransaction,
-  InsertUser,
-  LoyaltyCard,
+  InsertPointsLedgerEntry,
+  LoyaltyAccount,
+  Member,
+  Merchant,
+  MerchantAccrualRule,
+  Offer,
   PatronageMilestone,
+  PointsLedgerEntry,
   Redemption,
-  RewardsOffer,
-  Transaction,
-  User,
-  accrualRules,
-  businesses,
-  campaignRecipients,
-  campaigns,
-  loyaltyCards,
+  loyaltyAccounts,
+  members,
+  merchantAccrualRules,
+  merchants,
+  offers,
   patronageMilestones,
+  platformAdmins,
+  pointsLedger,
   redemptions,
-  rewardsOffers,
-  transactions,
-  users,
 } from "../drizzle/schema";
-import { ENV } from "./_core/env";
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
@@ -48,388 +40,272 @@ export async function getDb() {
   return _db;
 }
 
-// ─── Users ────────────────────────────────────────────────────────────────────
+// ─── Members (consumers, owned by magicfishbowl) ───────────────────────────────
 
-export async function upsertUser(user: InsertUser): Promise<void> {
-  if (!user.openId) throw new Error("User openId is required for upsert");
-  const db = await getDb();
-  if (!db) return;
-
-  const values: InsertUser = { openId: user.openId };
-  const updateSet: Record<string, unknown> = {};
-
-  const fields = ["name", "email", "loginMethod", "phone", "avatarUrl"] as const;
-  for (const field of fields) {
-    const val = user[field];
-    if (val !== undefined) {
-      values[field] = val ?? null;
-      updateSet[field] = val ?? null;
-    }
-  }
-
-  if (user.lastSignedIn !== undefined) {
-    values.lastSignedIn = user.lastSignedIn;
-    updateSet.lastSignedIn = user.lastSignedIn;
-  }
-  if (user.role !== undefined) {
-    values.role = user.role;
-    updateSet.role = user.role;
-  } else if (ENV.ownerEmail && user.email === ENV.ownerEmail) {
-    values.role = "admin";
-    updateSet.role = "admin";
-  }
-  if (!values.lastSignedIn) values.lastSignedIn = new Date();
-  if (Object.keys(updateSet).length === 0) updateSet.lastSignedIn = new Date();
-
-  await db.insert(users).values(values).onConflictDoUpdate({ target: users.openId, set: updateSet });
-}
-
-export async function getUserByOpenId(openId: string): Promise<User | undefined> {
+export async function getMemberByUserId(userId: string): Promise<Member | undefined> {
   const db = await getDb();
   if (!db) return undefined;
-  const result = await db.select().from(users).where(eq(users.openId, openId)).limit(1);
+  const result = await db.select().from(members).where(eq(members.userId, userId)).limit(1);
   return result[0];
 }
 
-export async function updateUserOnboarding(
-  userId: number,
-  data: { name?: string; phone?: string; role?: "consumer" | "business_owner" | "admin"; onboardingComplete?: boolean }
-): Promise<void> {
-  const db = await getDb();
-  if (!db) return;
-  await db.update(users).set({ ...data, updatedAt: new Date() }).where(eq(users.id, userId));
-}
-
-export async function getAllUsers(limit = 100, offset = 0): Promise<User[]> {
-  const db = await getDb();
-  if (!db) return [];
-  return db.select().from(users).limit(limit).offset(offset).orderBy(desc(users.createdAt));
-}
-
-// ─── Businesses ───────────────────────────────────────────────────────────────
-
-export async function createBusiness(data: InsertBusiness): Promise<number> {
-  const db = await getDb();
-  if (!db) throw new Error("DB unavailable");
-  const [row] = await db.insert(businesses).values(data).returning({ id: businesses.id });
-  return row!.id;
-}
-
-export async function getBusinessById(id: number): Promise<Business | undefined> {
+export async function getMemberById(id: string): Promise<Member | undefined> {
   const db = await getDb();
   if (!db) return undefined;
-  const result = await db.select().from(businesses).where(eq(businesses.id, id)).limit(1);
+  const result = await db.select().from(members).where(eq(members.id, id)).limit(1);
   return result[0];
 }
 
-export async function getBusinessByOwnerId(ownerId: number): Promise<Business | undefined> {
-  const db = await getDb();
-  if (!db) return undefined;
-  const result = await db.select().from(businesses).where(eq(businesses.ownerId, ownerId)).limit(1);
-  return result[0];
-}
-
-export async function updateBusiness(id: number, data: Partial<InsertBusiness>): Promise<void> {
-  const db = await getDb();
-  if (!db) return;
-  await db.update(businesses).set({ ...data, updatedAt: new Date() }).where(eq(businesses.id, id));
-}
-
-export async function getApprovedBusinesses(limit = 50, offset = 0): Promise<Business[]> {
+export async function findMemberByPhoneOrEmail(query: string): Promise<Member[]> {
   const db = await getDb();
   if (!db) return [];
   return db
     .select()
-    .from(businesses)
-    .where(eq(businesses.status, "approved"))
+    .from(members)
+    .where(sql`${members.phone} ilike ${`%${query}%`} or ${members.email} ilike ${`%${query}%`} or ${members.fullName} ilike ${`%${query}%`}`)
+    .limit(20);
+}
+
+// ─── Merchants (owned by magicfishbowl) ────────────────────────────────────────
+
+export async function getMerchantByOwnerId(ownerUserId: string): Promise<Merchant | undefined> {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(merchants).where(eq(merchants.ownerUserId, ownerUserId)).limit(1);
+  return result[0];
+}
+
+export async function getMerchantById(id: string): Promise<Merchant | undefined> {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(merchants).where(eq(merchants.id, id)).limit(1);
+  return result[0];
+}
+
+export async function getLiveMerchants(limit = 50, offset = 0): Promise<Merchant[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select()
+    .from(merchants)
+    .where(eq(merchants.isLive, true))
     .limit(limit)
     .offset(offset)
-    .orderBy(desc(businesses.createdAt));
+    .orderBy(desc(merchants.createdAt));
 }
 
-export async function getAllBusinesses(limit = 100, offset = 0): Promise<Business[]> {
+// ─── Offers / Redemptions (read-only here, owned by magicfishbowl) ────────────
+
+export async function getActiveOffersByMerchant(merchantId: string): Promise<Offer[]> {
   const db = await getDb();
   if (!db) return [];
-  return db.select().from(businesses).limit(limit).offset(offset).orderBy(desc(businesses.createdAt));
+  return db
+    .select()
+    .from(offers)
+    .where(and(eq(offers.merchantId, merchantId), eq(offers.isActive, true)));
 }
 
-export async function getPendingBusinesses(): Promise<Business[]> {
+export async function getRedemptionsByMember(memberId: string, limit = 50): Promise<(Redemption & { offerTitle: string | null; merchantName: string | null })[]> {
   const db = await getDb();
   if (!db) return [];
-  return db.select().from(businesses).where(eq(businesses.status, "pending")).orderBy(desc(businesses.createdAt));
+  const rows = await db
+    .select({
+      id: redemptions.id,
+      memberId: redemptions.memberId,
+      merchantId: redemptions.merchantId,
+      offerId: redemptions.offerId,
+      staffId: redemptions.staffId,
+      scannedAt: redemptions.scannedAt,
+      confirmedAt: redemptions.confirmedAt,
+      status: redemptions.status,
+      offerTitle: offers.title,
+      merchantName: merchants.businessName,
+    })
+    .from(redemptions)
+    .leftJoin(offers, eq(offers.id, redemptions.offerId))
+    .leftJoin(merchants, eq(merchants.id, redemptions.merchantId))
+    .where(eq(redemptions.memberId, memberId))
+    .orderBy(desc(redemptions.scannedAt))
+    .limit(limit);
+  return rows;
 }
 
-// ─── Loyalty Cards ────────────────────────────────────────────────────────────
+// ─── Loyalty Accounts (owned here) ─────────────────────────────────────────────
 
-export async function getOrCreateLoyaltyCard(consumerId: number, businessId: number): Promise<LoyaltyCard> {
+export async function getOrCreateLoyaltyAccount(memberId: string, merchantId: string): Promise<LoyaltyAccount> {
   const db = await getDb();
   if (!db) throw new Error("DB unavailable");
 
   const existing = await db
     .select()
-    .from(loyaltyCards)
-    .where(and(eq(loyaltyCards.consumerId, consumerId), eq(loyaltyCards.businessId, businessId)))
+    .from(loyaltyAccounts)
+    .where(and(eq(loyaltyAccounts.memberId, memberId), eq(loyaltyAccounts.merchantId, merchantId)))
     .limit(1);
 
   if (existing[0]) return existing[0];
 
-  const cardNumber = `LR-${Date.now()}-${Math.floor(Math.random() * 9999).toString().padStart(4, "0")}`;
-  const [created] = await db.insert(loyaltyCards).values({ consumerId, businessId, cardNumber }).returning();
+  const [created] = await db.insert(loyaltyAccounts).values({ memberId, merchantId }).returning();
   return created!;
 }
 
-export async function getLoyaltyCardsByConsumer(consumerId: number): Promise<LoyaltyCard[]> {
+export async function getLoyaltyAccountsByMember(memberId: string): Promise<(LoyaltyAccount & { merchant: Merchant | null })[]> {
   const db = await getDb();
   if (!db) return [];
-  return db.select().from(loyaltyCards).where(eq(loyaltyCards.consumerId, consumerId));
+  const rows = await db
+    .select({ account: loyaltyAccounts, merchant: merchants })
+    .from(loyaltyAccounts)
+    .leftJoin(merchants, eq(merchants.id, loyaltyAccounts.merchantId))
+    .where(eq(loyaltyAccounts.memberId, memberId));
+  return rows.map((r) => ({ ...r.account, merchant: r.merchant }));
 }
 
-export async function getLoyaltyCardsByBusiness(businessId: number): Promise<LoyaltyCard[]> {
+export async function getLoyaltyAccountsByMerchant(merchantId: string): Promise<LoyaltyAccount[]> {
   const db = await getDb();
   if (!db) return [];
-  return db.select().from(loyaltyCards).where(eq(loyaltyCards.businessId, businessId));
+  return db.select().from(loyaltyAccounts).where(eq(loyaltyAccounts.merchantId, merchantId));
 }
 
-export async function updateLoyaltyCard(id: number, data: Partial<InsertLoyaltyCard>): Promise<void> {
+export async function updateLoyaltyAccount(id: string, data: Partial<InsertLoyaltyAccount>): Promise<void> {
   const db = await getDb();
   if (!db) return;
-  await db.update(loyaltyCards).set({ ...data, updatedAt: new Date() }).where(eq(loyaltyCards.id, id));
+  await db.update(loyaltyAccounts).set({ ...data, updatedAt: new Date() }).where(eq(loyaltyAccounts.id, id));
 }
 
-// ─── Transactions ─────────────────────────────────────────────────────────────
+// ─── Points Ledger (owned here) ────────────────────────────────────────────────
 
-export async function createTransaction(data: InsertTransaction): Promise<void> {
+export async function createPointsLedgerEntry(data: InsertPointsLedgerEntry): Promise<void> {
   const db = await getDb();
   if (!db) return;
-  await db.insert(transactions).values(data);
+  await db.insert(pointsLedger).values(data);
 }
 
-export async function getTransactionsByCard(cardId: number, limit = 50): Promise<Transaction[]> {
+export async function getPointsLedgerByAccount(loyaltyAccountId: string, limit = 50): Promise<PointsLedgerEntry[]> {
   const db = await getDb();
   if (!db) return [];
   return db
     .select()
-    .from(transactions)
-    .where(eq(transactions.cardId, cardId))
-    .orderBy(desc(transactions.createdAt))
+    .from(pointsLedger)
+    .where(eq(pointsLedger.loyaltyAccountId, loyaltyAccountId))
+    .orderBy(desc(pointsLedger.createdAt))
     .limit(limit);
 }
 
-export async function getTransactionsByBusiness(businessId: number, limit = 100): Promise<Transaction[]> {
+// ─── Merchant Accrual Rules (owned here) ───────────────────────────────────────
+
+export async function getAccrualRule(merchantId: string): Promise<MerchantAccrualRule | undefined> {
   const db = await getDb();
-  if (!db) return [];
-  return db
-    .select()
-    .from(transactions)
-    .where(eq(transactions.businessId, businessId))
-    .orderBy(desc(transactions.createdAt))
-    .limit(limit);
+  if (!db) return undefined;
+  const result = await db.select().from(merchantAccrualRules).where(eq(merchantAccrualRules.merchantId, merchantId)).limit(1);
+  return result[0];
 }
 
-// ─── Rewards Offers ───────────────────────────────────────────────────────────
-
-export async function createRewardsOffer(data: InsertRewardsOffer): Promise<number> {
-  const db = await getDb();
-  if (!db) throw new Error("DB unavailable");
-  const [row] = await db.insert(rewardsOffers).values(data).returning({ id: rewardsOffers.id });
-  return row!.id;
-}
-
-export async function getOffersByBusiness(businessId: number): Promise<RewardsOffer[]> {
-  const db = await getDb();
-  if (!db) return [];
-  return db.select().from(rewardsOffers).where(eq(rewardsOffers.businessId, businessId)).orderBy(desc(rewardsOffers.createdAt));
-}
-
-export async function getActiveOffersByBusiness(businessId: number): Promise<RewardsOffer[]> {
-  const db = await getDb();
-  if (!db) return [];
-  return db
-    .select()
-    .from(rewardsOffers)
-    .where(and(eq(rewardsOffers.businessId, businessId), eq(rewardsOffers.isActive, true)));
-}
-
-export async function updateRewardsOffer(id: number, data: Partial<InsertRewardsOffer>): Promise<void> {
+export async function upsertAccrualRule(data: InsertMerchantAccrualRule): Promise<void> {
   const db = await getDb();
   if (!db) return;
-  await db.update(rewardsOffers).set({ ...data, updatedAt: new Date() }).where(eq(rewardsOffers.id, id));
+  await db
+    .insert(merchantAccrualRules)
+    .values(data)
+    .onConflictDoUpdate({ target: merchantAccrualRules.merchantId, set: { ...data, updatedAt: new Date() } });
 }
 
-export async function deleteRewardsOffer(id: number): Promise<void> {
-  const db = await getDb();
-  if (!db) return;
-  await db.delete(rewardsOffers).where(eq(rewardsOffers.id, id));
-}
+// ─── Patronage Milestones (owned here) ─────────────────────────────────────────
 
-// ─── Patronage Milestones ─────────────────────────────────────────────────────
-
-export async function getMilestonesByBusiness(businessId: number): Promise<PatronageMilestone[]> {
+export async function getMilestonesByMerchant(merchantId: string): Promise<PatronageMilestone[]> {
   const db = await getDb();
   if (!db) return [];
-  return db.select().from(patronageMilestones).where(eq(patronageMilestones.businessId, businessId));
+  return db.select().from(patronageMilestones).where(eq(patronageMilestones.merchantId, merchantId));
 }
 
-export async function createMilestone(data: InsertPatronageMilestone): Promise<number> {
+export async function createMilestone(data: InsertPatronageMilestone): Promise<string> {
   const db = await getDb();
   if (!db) throw new Error("DB unavailable");
   const [row] = await db.insert(patronageMilestones).values(data).returning({ id: patronageMilestones.id });
   return row!.id;
 }
 
-export async function deleteMilestone(id: number): Promise<void> {
+export async function deleteMilestone(id: string): Promise<void> {
   const db = await getDb();
   if (!db) return;
   await db.delete(patronageMilestones).where(eq(patronageMilestones.id, id));
 }
 
-// ─── Redemptions ──────────────────────────────────────────────────────────────
+// ─── Platform Admins (owned here) ──────────────────────────────────────────────
 
-export async function createRedemption(data: InsertRedemption): Promise<number> {
+export async function isPlatformAdmin(userId: string): Promise<boolean> {
   const db = await getDb();
-  if (!db) throw new Error("DB unavailable");
-  const [row] = await db.insert(redemptions).values(data).returning({ id: redemptions.id });
-  return row!.id;
+  if (!db) return false;
+  const result = await db.select().from(platformAdmins).where(eq(platformAdmins.userId, userId)).limit(1);
+  return result.length > 0;
 }
 
-export async function getRedemptionsByConsumer(consumerId: number): Promise<Redemption[]> {
-  const db = await getDb();
-  if (!db) return [];
-  return db
-    .select()
-    .from(redemptions)
-    .where(eq(redemptions.consumerId, consumerId))
-    .orderBy(desc(redemptions.redeemedAt));
-}
-
-export async function getRedemptionsByBusiness(businessId: number): Promise<Redemption[]> {
-  const db = await getDb();
-  if (!db) return [];
-  return db
-    .select()
-    .from(redemptions)
-    .where(eq(redemptions.businessId, businessId))
-    .orderBy(desc(redemptions.redeemedAt));
-}
-
-export async function updateRedemption(id: number, data: Partial<InsertRedemption>): Promise<void> {
+export async function grantPlatformAdmin(userId: string): Promise<void> {
   const db = await getDb();
   if (!db) return;
-  await db.update(redemptions).set(data).where(eq(redemptions.id, id));
+  await db.insert(platformAdmins).values({ userId }).onConflictDoNothing();
 }
 
-// ─── Campaigns ────────────────────────────────────────────────────────────────
-
-export async function createCampaign(data: InsertCampaign): Promise<number> {
-  const db = await getDb();
-  if (!db) throw new Error("DB unavailable");
-  const [row] = await db.insert(campaigns).values(data).returning({ id: campaigns.id });
-  return row!.id;
-}
-
-export async function getCampaignsByBusiness(businessId: number): Promise<Campaign[]> {
-  const db = await getDb();
-  if (!db) return [];
-  return db
-    .select()
-    .from(campaigns)
-    .where(eq(campaigns.businessId, businessId))
-    .orderBy(desc(campaigns.createdAt));
-}
-
-export async function updateCampaign(id: number, data: Partial<InsertCampaign>): Promise<void> {
-  const db = await getDb();
-  if (!db) return;
-  await db.update(campaigns).set({ ...data, updatedAt: new Date() }).where(eq(campaigns.id, id));
-}
-
-// ─── Accrual Rules ────────────────────────────────────────────────────────────
-
-export async function getAccrualRule(businessId: number): Promise<AccrualRule | undefined> {
-  const db = await getDb();
-  if (!db) return undefined;
-  const result = await db.select().from(accrualRules).where(eq(accrualRules.businessId, businessId)).limit(1);
-  return result[0];
-}
-
-export async function upsertAccrualRule(data: InsertAccrualRule): Promise<void> {
-  const db = await getDb();
-  if (!db) return;
-  await db.insert(accrualRules).values(data).onConflictDoUpdate({ target: accrualRules.businessId, set: data });
-}
-
-// ─── Platform Analytics ───────────────────────────────────────────────────────
+// ─── Platform Analytics ─────────────────────────────────────────────────────────
 
 export async function getPlatformStats() {
   const db = await getDb();
-  if (!db) return { totalUsers: 0, totalBusinesses: 0, totalCards: 0, totalPointsIssued: 0, totalRedemptions: 0 };
+  if (!db) return { totalMembers: 0, totalMerchants: 0, liveMerchants: 0, totalPointsIssued: 0, totalRedemptions: 0 };
 
-  const [userCount] = await db.select({ count: sql<number>`count(*)` }).from(users);
-  const [bizCount] = await db.select({ count: sql<number>`count(*)` }).from(businesses);
-  const [cardCount] = await db.select({ count: sql<number>`count(*)` }).from(loyaltyCards);
+  const [memberCount] = await db.select({ count: sql<number>`count(*)` }).from(members);
+  const [merchantCount] = await db.select({ count: sql<number>`count(*)` }).from(merchants);
+  const [liveMerchantCount] = await db.select({ count: sql<number>`count(*)` }).from(merchants).where(eq(merchants.isLive, true));
   const [pointsSum] = await db
     .select({ total: sql<number>`COALESCE(SUM(points), 0)` })
-    .from(transactions)
-    .where(eq(transactions.type, "earn"));
-  const [redemptionCount] = await db.select({ count: sql<number>`count(*)` }).from(redemptions);
+    .from(pointsLedger)
+    .where(eq(pointsLedger.type, "earn"));
+  const [redemptionCount] = await db.select({ count: sql<number>`count(*)` }).from(redemptions).where(eq(redemptions.status, "confirmed"));
 
   return {
-    totalUsers: Number(userCount?.count ?? 0),
-    totalBusinesses: Number(bizCount?.count ?? 0),
-    totalCards: Number(cardCount?.count ?? 0),
+    totalMembers: Number(memberCount?.count ?? 0),
+    totalMerchants: Number(merchantCount?.count ?? 0),
+    liveMerchants: Number(liveMerchantCount?.count ?? 0),
     totalPointsIssued: Number(pointsSum?.total ?? 0),
     totalRedemptions: Number(redemptionCount?.count ?? 0),
   };
 }
 
-export async function getBusinessStats(businessId: number) {
+export async function getMerchantStats(merchantId: string) {
   const db = await getDb();
   if (!db) return { customerCount: 0, pointsIssued: 0, redemptionCount: 0, activeOffers: 0 };
 
-  const [cardCount] = await db
+  const [accountCount] = await db
     .select({ count: sql<number>`count(*)` })
-    .from(loyaltyCards)
-    .where(eq(loyaltyCards.businessId, businessId));
+    .from(loyaltyAccounts)
+    .where(eq(loyaltyAccounts.merchantId, merchantId));
   const [pointsSum] = await db
-    .select({ total: sql<number>`COALESCE(SUM(points), 0)` })
-    .from(transactions)
-    .where(and(eq(transactions.businessId, businessId), eq(transactions.type, "earn")));
+    .select({ total: sql<number>`COALESCE(SUM(${pointsLedger.points}), 0)` })
+    .from(pointsLedger)
+    .innerJoin(loyaltyAccounts, eq(loyaltyAccounts.id, pointsLedger.loyaltyAccountId))
+    .where(and(eq(loyaltyAccounts.merchantId, merchantId), eq(pointsLedger.type, "earn")));
   const [redemptionCount] = await db
     .select({ count: sql<number>`count(*)` })
     .from(redemptions)
-    .where(eq(redemptions.businessId, businessId));
+    .where(and(eq(redemptions.merchantId, merchantId), eq(redemptions.status, "confirmed")));
   const [offerCount] = await db
     .select({ count: sql<number>`count(*)` })
-    .from(rewardsOffers)
-    .where(and(eq(rewardsOffers.businessId, businessId), eq(rewardsOffers.isActive, true)));
+    .from(offers)
+    .where(and(eq(offers.merchantId, merchantId), eq(offers.isActive, true)));
 
   return {
-    customerCount: Number(cardCount?.count ?? 0),
+    customerCount: Number(accountCount?.count ?? 0),
     pointsIssued: Number(pointsSum?.total ?? 0),
     redemptionCount: Number(redemptionCount?.count ?? 0),
     activeOffers: Number(offerCount?.count ?? 0),
   };
 }
 
-export async function getBusinessCustomers(businessId: number) {
+export async function getMerchantCustomers(merchantId: string): Promise<{ member: Member; account: LoyaltyAccount }[]> {
   const db = await getDb();
   if (!db) return [];
-  const cards = await db
-    .select()
-    .from(loyaltyCards)
-    .where(eq(loyaltyCards.businessId, businessId))
-    .orderBy(desc(loyaltyCards.enrolledAt));
-
-  const customerIds = cards.map((c) => c.consumerId);
-  if (customerIds.length === 0) return [];
-
-  const customerList = await Promise.all(
-    customerIds.map(async (id) => {
-      const userResult = await db.select().from(users).where(eq(users.id, id)).limit(1);
-      const card = cards.find((c) => c.consumerId === id);
-      return { user: userResult[0], card };
-    })
-  );
-
-  return customerList.filter((c) => c.user && c.card);
+  const rows = await db
+    .select({ account: loyaltyAccounts, member: members })
+    .from(loyaltyAccounts)
+    .innerJoin(members, eq(members.id, loyaltyAccounts.memberId))
+    .where(eq(loyaltyAccounts.merchantId, merchantId))
+    .orderBy(desc(loyaltyAccounts.enrolledAt));
+  return rows.map((r) => ({ member: r.member, account: r.account }));
 }

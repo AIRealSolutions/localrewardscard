@@ -1,210 +1,190 @@
 import {
   boolean,
+  doublePrecision,
   integer,
-  json,
+  jsonb,
   numeric,
   pgEnum,
   pgTable,
-  serial,
   text,
   timestamp,
-  varchar,
+  uuid,
 } from "drizzle-orm/pg-core";
 
-// ─── Enums ────────────────────────────────────────────────────────────────────
-export const userRoleEnum = pgEnum("user_role", ["consumer", "business_owner", "admin"]);
-export const businessStatusEnum = pgEnum("business_status", ["pending", "approved", "rejected", "suspended"]);
-export const loyaltyTierEnum = pgEnum("loyalty_tier", ["bronze", "silver", "gold", "platinum"]);
-export const transactionTypeEnum = pgEnum("transaction_type", ["earn", "redeem", "bonus", "expire", "adjustment"]);
-export const discountTypeEnum = pgEnum("discount_type", ["percent", "fixed", "freebie", "service"]);
-export const redemptionStatusEnum = pgEnum("redemption_status", ["pending", "confirmed", "cancelled"]);
+// ─────────────────────────────────────────────────────────────────────────────
+// Tables below this line are owned by the `magicfishbowl` repo
+// (supabase/schema.sql there is the source of truth — do not run drizzle-kit
+// push/generate against this database from this repo). These declarations
+// only cover the columns Local Rewards Card actually reads/writes.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const subscriptionTierEnum = pgEnum("subscription_tier", ["starter", "pro", "agency"]);
+export const subscriptionStatusEnum = pgEnum("subscription_status", ["trialing", "active", "past_due", "canceled"]);
+export const offerTypeEnum = pgEnum("offer_type", ["giveaway", "discount"]);
+export const redemptionStatusEnum = pgEnum("redemption_status", ["pending_pin", "confirmed", "flagged"]);
 export const campaignTypeEnum = pgEnum("campaign_type", ["email", "sms", "social"]);
-export const campaignStatusEnum = pgEnum("campaign_status", ["draft", "scheduled", "sent", "failed"]);
-export const campaignRecipientStatusEnum = pgEnum("campaign_recipient_status", ["pending", "sent", "opened", "failed"]);
+export const campaignStatusEnum = pgEnum("campaign_status", ["draft", "active", "paused", "completed"]);
 
-// ─── Users ────────────────────────────────────────────────────────────────────
-export const users = pgTable("users", {
-  id: serial("id").primaryKey(),
-  openId: varchar("openId", { length: 64 }).notNull().unique(),
-  name: text("name"),
-  email: varchar("email", { length: 320 }),
-  phone: varchar("phone", { length: 32 }),
-  loginMethod: varchar("loginMethod", { length: 64 }),
-  role: userRoleEnum("role").default("consumer").notNull(),
-  onboardingComplete: boolean("onboardingComplete").default(false).notNull(),
-  avatarUrl: text("avatarUrl"),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
-  lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
+export const members = pgTable("members", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id"),
+  email: text("email").notNull(),
+  phone: text("phone").notNull(),
+  fullName: text("full_name").notNull(),
+  qrToken: text("qr_token").notNull(),
+  nfcToken: text("nfc_token").notNull(),
+  phoneVerified: boolean("phone_verified").notNull().default(false),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
-export type User = typeof users.$inferSelect;
-export type InsertUser = typeof users.$inferInsert;
+export type Member = typeof members.$inferSelect;
 
-// ─── Businesses ───────────────────────────────────────────────────────────────
-export const businesses = pgTable("businesses", {
-  id: serial("id").primaryKey(),
-  ownerId: integer("ownerId").notNull(),
-  name: varchar("name", { length: 255 }).notNull(),
-  slug: varchar("slug", { length: 128 }).unique(),
-  description: text("description"),
-  category: varchar("category", { length: 128 }),
+export const merchants = pgTable("merchants", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  ownerUserId: uuid("owner_user_id").notNull(),
+  businessName: text("business_name").notNull(),
+  category: text("category").notNull(),
   address: text("address"),
-  city: varchar("city", { length: 128 }),
-  state: varchar("state", { length: 64 }),
-  zip: varchar("zip", { length: 16 }),
-  phone: varchar("phone", { length: 32 }),
-  email: varchar("email", { length: 320 }),
-  website: text("website"),
-  logoUrl: text("logoUrl"),
-  coverImageUrl: text("coverImageUrl"),
-  status: businessStatusEnum("status").default("pending").notNull(),
-  magicfishbowlId: varchar("magicfishbowlId", { length: 128 }),
-  magicfishbowlSynced: boolean("magicfishbowlSynced").default(false).notNull(),
-  pointsPerDollar: numeric("pointsPerDollar", { precision: 10, scale: 2 }).default("1.00").notNull(),
-  pointsPerVisit: integer("pointsPerVisit").default(0).notNull(),
-  pointsExpireDays: integer("pointsExpireDays").default(0), // 0 = never
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+  lat: doublePrecision("lat"),
+  lng: doublePrecision("lng"),
+  logoUrl: text("logo_url"),
+  hours: jsonb("hours"),
+  subscriptionTier: subscriptionTierEnum("subscription_tier").notNull().default("starter"),
+  subscriptionStatus: subscriptionStatusEnum("subscription_status").notNull().default("trialing"),
+  isLive: boolean("is_live").notNull().default(false),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
-export type Business = typeof businesses.$inferSelect;
-export type InsertBusiness = typeof businesses.$inferInsert;
+export type Merchant = typeof merchants.$inferSelect;
 
-// ─── Loyalty Cards ────────────────────────────────────────────────────────────
-export const loyaltyCards = pgTable("loyalty_cards", {
-  id: serial("id").primaryKey(),
-  consumerId: integer("consumerId").notNull(),
-  businessId: integer("businessId").notNull(),
-  pointsBalance: integer("pointsBalance").default(0).notNull(),
-  lifetimePoints: integer("lifetimePoints").default(0).notNull(),
-  visitCount: integer("visitCount").default(0).notNull(),
-  tier: loyaltyTierEnum("tier").default("bronze").notNull(),
-  cardNumber: varchar("cardNumber", { length: 32 }).unique(),
-  isActive: boolean("isActive").default(true).notNull(),
-  enrolledAt: timestamp("enrolledAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
-});
-
-export type LoyaltyCard = typeof loyaltyCards.$inferSelect;
-export type InsertLoyaltyCard = typeof loyaltyCards.$inferInsert;
-
-// ─── Transactions ─────────────────────────────────────────────────────────────
-export const transactions = pgTable("transactions", {
-  id: serial("id").primaryKey(),
-  cardId: integer("cardId").notNull(),
-  businessId: integer("businessId").notNull(),
-  consumerId: integer("consumerId").notNull(),
-  type: transactionTypeEnum("type").notNull(),
-  points: integer("points").notNull(), // positive = earn, negative = redeem/expire
-  amountSpent: numeric("amountSpent", { precision: 10, scale: 2 }),
+export const offers = pgTable("offers", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  merchantId: uuid("merchant_id").notNull(),
+  title: text("title").notNull(),
   description: text("description"),
-  referenceId: varchar("referenceId", { length: 128 }), // offer or campaign id
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  offerType: offerTypeEnum("offer_type").notNull().default("giveaway"),
+  discountValue: doublePrecision("discount_value"),
+  maxTotalUses: integer("max_total_uses"),
+  perMemberLimit: integer("per_member_limit").notNull().default(1),
+  cooldownDays: integer("cooldown_days").notNull().default(30),
+  expiresAt: timestamp("expires_at", { withTimezone: true }),
+  isActive: boolean("is_active").notNull().default(true),
+  totalRedeemed: integer("total_redeemed").notNull().default(0),
+  pointsRequired: integer("points_required"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
-export type Transaction = typeof transactions.$inferSelect;
-export type InsertTransaction = typeof transactions.$inferInsert;
+export type Offer = typeof offers.$inferSelect;
+export type InsertOffer = typeof offers.$inferInsert;
 
-// ─── Rewards Offers ───────────────────────────────────────────────────────────
-export const rewardsOffers = pgTable("rewards_offers", {
-  id: serial("id").primaryKey(),
-  businessId: integer("businessId").notNull(),
-  title: varchar("title", { length: 255 }).notNull(),
-  description: text("description"),
-  pointsRequired: integer("pointsRequired").notNull(),
-  discountType: discountTypeEnum("discountType").notNull(),
-  discountValue: numeric("discountValue", { precision: 10, scale: 2 }),
-  discountDescription: text("discountDescription"),
-  maxRedemptions: integer("maxRedemptions"), // null = unlimited
-  redemptionsUsed: integer("redemptionsUsed").default(0).notNull(),
-  validFrom: timestamp("validFrom"),
-  validUntil: timestamp("validUntil"),
-  isActive: boolean("isActive").default(true).notNull(),
-  imageUrl: text("imageUrl"),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
-});
-
-export type RewardsOffer = typeof rewardsOffers.$inferSelect;
-export type InsertRewardsOffer = typeof rewardsOffers.$inferInsert;
-
-// ─── Patronage Milestones ─────────────────────────────────────────────────────
-export const patronageMilestones = pgTable("patronage_milestones", {
-  id: serial("id").primaryKey(),
-  businessId: integer("businessId").notNull(),
-  visitCount: integer("visitCount").notNull(), // trigger at this visit number
-  title: varchar("title", { length: 255 }).notNull(),
-  rewardDescription: text("rewardDescription"),
-  bonusPoints: integer("bonusPoints").default(0).notNull(),
-  offerId: integer("offerId"), // optional linked offer
-  isActive: boolean("isActive").default(true).notNull(),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-});
-
-export type PatronageMilestone = typeof patronageMilestones.$inferSelect;
-export type InsertPatronageMilestone = typeof patronageMilestones.$inferInsert;
-
-// ─── Redemptions ──────────────────────────────────────────────────────────────
 export const redemptions = pgTable("redemptions", {
-  id: serial("id").primaryKey(),
-  cardId: integer("cardId").notNull(),
-  offerId: integer("offerId").notNull(),
-  consumerId: integer("consumerId").notNull(),
-  businessId: integer("businessId").notNull(),
-  status: redemptionStatusEnum("status").default("pending").notNull(),
-  pointsSpent: integer("pointsSpent").notNull(),
-  confirmationCode: varchar("confirmationCode", { length: 16 }),
-  redeemedAt: timestamp("redeemedAt").defaultNow().notNull(),
-  confirmedAt: timestamp("confirmedAt"),
-  expiresAt: timestamp("expiresAt"),
+  id: uuid("id").primaryKey().defaultRandom(),
+  memberId: uuid("member_id").notNull(),
+  merchantId: uuid("merchant_id").notNull(),
+  offerId: uuid("offer_id").notNull(),
+  staffId: uuid("staff_id"),
+  scannedAt: timestamp("scanned_at", { withTimezone: true }).notNull().defaultNow(),
+  confirmedAt: timestamp("confirmed_at", { withTimezone: true }),
+  status: redemptionStatusEnum("status").notNull().default("pending_pin"),
 });
 
 export type Redemption = typeof redemptions.$inferSelect;
-export type InsertRedemption = typeof redemptions.$inferInsert;
 
-// ─── Campaigns ────────────────────────────────────────────────────────────────
+export const crmContacts = pgTable("crm_contacts", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  merchantId: uuid("merchant_id").notNull(),
+  memberId: uuid("member_id"),
+  email: text("email").notNull(),
+  phone: text("phone"),
+  fullName: text("full_name").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export type CrmContact = typeof crmContacts.$inferSelect;
+export type InsertCrmContact = typeof crmContacts.$inferInsert;
+
 export const campaigns = pgTable("campaigns", {
-  id: serial("id").primaryKey(),
-  businessId: integer("businessId").notNull(),
-  type: campaignTypeEnum("type").notNull(),
-  subject: varchar("subject", { length: 255 }),
-  body: text("body").notNull(),
-  socialPlatform: varchar("socialPlatform", { length: 64 }),
-  status: campaignStatusEnum("status").default("draft").notNull(),
-  recipientCount: integer("recipientCount").default(0).notNull(),
-  openCount: integer("openCount").default(0).notNull(),
-  scheduledAt: timestamp("scheduledAt"),
-  sentAt: timestamp("sentAt"),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+  id: uuid("id").primaryKey().defaultRandom(),
+  merchantId: uuid("merchant_id").notNull(),
+  name: text("name").notNull(),
+  type: campaignTypeEnum("type").notNull().default("email"),
+  status: campaignStatusEnum("status").notNull().default("draft"),
+  trigger: jsonb("trigger").notNull(),
+  steps: jsonb("steps").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
 export type Campaign = typeof campaigns.$inferSelect;
 export type InsertCampaign = typeof campaigns.$inferInsert;
 
-// ─── Campaign Recipients ──────────────────────────────────────────────────────
-export const campaignRecipients = pgTable("campaign_recipients", {
-  id: serial("id").primaryKey(),
-  campaignId: integer("campaignId").notNull(),
-  consumerId: integer("consumerId").notNull(),
-  status: campaignRecipientStatusEnum("status").default("pending").notNull(),
-  sentAt: timestamp("sentAt"),
+// ─────────────────────────────────────────────────────────────────────────────
+// Tables below this line are owned by this repo (Local Rewards Card's
+// additive loyalty layer — see the `local_rewards_loyalty_layer` migration
+// applied directly via the Supabase MCP, not drizzle-kit).
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const loyaltyTierEnum = pgEnum("loyalty_tier", ["bronze", "silver", "gold", "platinum"]);
+export const pointsTransactionTypeEnum = pgEnum("points_transaction_type", ["earn", "redeem", "bonus", "expire", "adjustment"]);
+
+export const loyaltyAccounts = pgTable("loyalty_accounts", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  memberId: uuid("member_id").notNull(),
+  merchantId: uuid("merchant_id").notNull(),
+  pointsBalance: integer("points_balance").notNull().default(0),
+  lifetimePoints: integer("lifetime_points").notNull().default(0),
+  visitCount: integer("visit_count").notNull().default(0),
+  tier: loyaltyTierEnum("tier").notNull().default("bronze"),
+  enrolledAt: timestamp("enrolled_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
-export type CampaignRecipient = typeof campaignRecipients.$inferSelect;
-export type InsertCampaignRecipient = typeof campaignRecipients.$inferInsert;
+export type LoyaltyAccount = typeof loyaltyAccounts.$inferSelect;
+export type InsertLoyaltyAccount = typeof loyaltyAccounts.$inferInsert;
 
-// ─── Business Accrual Rules ───────────────────────────────────────────────────
-export const accrualRules = pgTable("accrual_rules", {
-  id: serial("id").primaryKey(),
-  businessId: integer("businessId").notNull().unique(),
-  pointsPerDollar: numeric("pointsPerDollar", { precision: 10, scale: 2 }).default("1.00").notNull(),
-  pointsPerVisit: integer("pointsPerVisit").default(0).notNull(),
-  bonusMultiplier: numeric("bonusMultiplier", { precision: 5, scale: 2 }).default("1.00").notNull(),
-  tierThresholds: json("tierThresholds"), // { silver: 500, gold: 1500, platinum: 5000 }
-  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+export const pointsLedger = pgTable("points_ledger", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  loyaltyAccountId: uuid("loyalty_account_id").notNull(),
+  redemptionId: uuid("redemption_id"),
+  type: pointsTransactionTypeEnum("type").notNull(),
+  points: integer("points").notNull(),
+  amountSpent: numeric("amount_spent", { precision: 10, scale: 2 }),
+  description: text("description"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
-export type AccrualRule = typeof accrualRules.$inferSelect;
-export type InsertAccrualRule = typeof accrualRules.$inferInsert;
+export type PointsLedgerEntry = typeof pointsLedger.$inferSelect;
+export type InsertPointsLedgerEntry = typeof pointsLedger.$inferInsert;
+
+export const merchantAccrualRules = pgTable("merchant_accrual_rules", {
+  merchantId: uuid("merchant_id").primaryKey(),
+  pointsPerDollar: numeric("points_per_dollar", { precision: 10, scale: 2 }).notNull().default("1.00"),
+  pointsPerVisit: integer("points_per_visit").notNull().default(0),
+  bonusMultiplier: numeric("bonus_multiplier", { precision: 5, scale: 2 }).notNull().default("1.00"),
+  tierThresholds: jsonb("tier_thresholds"),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export type MerchantAccrualRule = typeof merchantAccrualRules.$inferSelect;
+export type InsertMerchantAccrualRule = typeof merchantAccrualRules.$inferInsert;
+
+export const patronageMilestones = pgTable("patronage_milestones", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  merchantId: uuid("merchant_id").notNull(),
+  visitCount: integer("visit_count").notNull(),
+  title: text("title").notNull(),
+  rewardDescription: text("reward_description"),
+  bonusPoints: integer("bonus_points").notNull().default(0),
+  offerId: uuid("offer_id"),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export type PatronageMilestone = typeof patronageMilestones.$inferSelect;
+export type InsertPatronageMilestone = typeof patronageMilestones.$inferInsert;
+
+export const platformAdmins = pgTable("platform_admins", {
+  userId: uuid("user_id").primaryKey(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export type PlatformAdmin = typeof platformAdmins.$inferSelect;
