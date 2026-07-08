@@ -3,15 +3,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { supabase } from "@/lib/supabase";
-import { Star, ArrowRight, Mail } from "lucide-react";
+import { Star, ArrowRight, Mail, ExternalLink } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
-type Mode = "sign-in" | "sign-up";
+const MAGICFISHBOWL_JOIN_URL = "https://magicfishbowl.com/join";
 
 export default function Login() {
   useDocumentTitle("Sign In | Local Rewards");
-  const [mode, setMode] = useState<Mode>("sign-in");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -21,11 +20,7 @@ export default function Login() {
     if (!email.trim() || !password) return;
     setSubmitting(true);
     try {
-      const { error } =
-        mode === "sign-in"
-          ? await supabase.auth.signInWithPassword({ email: email.trim(), password })
-          : await supabase.auth.signUp({ email: email.trim(), password });
-
+      const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
       if (error) throw error;
       window.location.href = "/";
     } catch (error) {
@@ -77,12 +72,8 @@ export default function Login() {
           </div>
         ) : (
           <>
-            <h2 className="font-serif text-3xl font-semibold text-foreground text-center mb-2">
-              {mode === "sign-in" ? "Welcome back" : "Create your account"}
-            </h2>
-            <p className="text-muted-foreground text-center mb-10">
-              {mode === "sign-in" ? "Sign in to access your rewards card." : "Join free and start earning rewards."}
-            </p>
+            <h2 className="font-serif text-3xl font-semibold text-foreground text-center mb-2">Welcome back</h2>
+            <p className="text-muted-foreground text-center mb-10">Sign in to access your rewards card.</p>
 
             <div className="space-y-5 mb-6">
               <div>
@@ -116,7 +107,7 @@ export default function Login() {
               disabled={!email.trim() || !password || submitting}
               onClick={handlePasswordAuth}
             >
-              {submitting ? "Please wait..." : mode === "sign-in" ? "Sign In" : "Create Account"}
+              {submitting ? "Please wait..." : "Sign In"}
               <ArrowRight className="ml-2 w-4 h-4" />
             </Button>
 
@@ -130,13 +121,15 @@ export default function Login() {
             </Button>
 
             <p className="text-center text-sm text-muted-foreground mt-8">
-              {mode === "sign-in" ? "New to Local Rewards?" : "Already have an account?"}{" "}
-              <button
-                className="text-primary font-medium hover:underline"
-                onClick={() => setMode(mode === "sign-in" ? "sign-up" : "sign-in")}
+              New to Local Rewards?{" "}
+              <a
+                href={MAGICFISHBOWL_JOIN_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-primary font-medium hover:underline inline-flex items-center gap-1"
               >
-                {mode === "sign-in" ? "Create an account" : "Sign in"}
-              </button>
+                Join on MagicFishbowl <ExternalLink className="w-3 h-3" />
+              </a>
             </p>
           </>
         )}

@@ -19,8 +19,8 @@ const TIER_NEXT: Record<string, { next: string; needed: number }> = {
 export default function ConsumerDashboard() {
   const { user } = useAuth();
   const [, navigate] = useLocation();
-  const { data: cards, isLoading } = trpc.consumer.getMyCards.useQuery();
-  const totalPoints = cards?.reduce((sum, { card }) => sum + card.pointsBalance, 0) ?? 0;
+  const { data: accounts, isLoading } = trpc.consumer.getMyCards.useQuery();
+  const totalPoints = accounts?.reduce((sum, a) => sum + a.pointsBalance, 0) ?? 0;
 
   return (
     <AppLayout title="My Rewards">
@@ -31,8 +31,8 @@ export default function ConsumerDashboard() {
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-10">
         {[
           { label: "Total Points", value: totalPoints.toLocaleString(), icon: <Star className="w-5 h-5" />, color: "text-amber-500" },
-          { label: "Active Cards", value: cards?.length ?? 0, icon: <Gift className="w-5 h-5" />, color: "text-primary" },
-          { label: "Businesses", value: cards?.length ?? 0, icon: <TrendingUp className="w-5 h-5" />, color: "text-emerald-500" },
+          { label: "Active Cards", value: accounts?.length ?? 0, icon: <Gift className="w-5 h-5" />, color: "text-primary" },
+          { label: "Businesses", value: accounts?.length ?? 0, icon: <TrendingUp className="w-5 h-5" />, color: "text-emerald-500" },
         ].map((stat) => (
           <div key={stat.label} className="bg-card rounded-2xl border border-border p-5 shadow-card">
             <div className={cn("mb-3", stat.color)}>{stat.icon}</div>
@@ -49,32 +49,32 @@ export default function ConsumerDashboard() {
       </div>
       {isLoading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">{[1,2].map(i => <Skeleton key={i} className="h-48 rounded-2xl" />)}</div>
-      ) : cards && cards.length > 0 ? (
+      ) : accounts && accounts.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-          {cards.map(({ card, business }) => {
-            if (!business) return null;
-            const tierColor = TIER_COLORS[card.tier] ?? "card-bronze";
-            const nextTier = TIER_NEXT[card.tier] ?? { next: "Platinum", needed: 5000 };
-            const progress = card.tier === "platinum" ? 100 : Math.min(100, (card.lifetimePoints / nextTier.needed) * 100);
+          {accounts.map((account) => {
+            if (!account.merchant) return null;
+            const tierColor = TIER_COLORS[account.tier] ?? "card-bronze";
+            const nextTier = TIER_NEXT[account.tier] ?? { next: "Platinum", needed: 5000 };
+            const progress = account.tier === "platinum" ? 100 : Math.min(100, (account.lifetimePoints / nextTier.needed) * 100);
             return (
-              <div key={card.id} className="group cursor-pointer" onClick={() => navigate(`/card/${business.id}`)}>
+              <div key={account.id} className="group cursor-pointer" onClick={() => navigate(`/card/${account.merchant!.id}`)}>
                 <div className={cn("relative rounded-2xl p-6 shadow-lg overflow-hidden transition-transform duration-200 group-hover:scale-[1.02]", tierColor)}>
                   <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent pointer-events-none" />
                   <div className="flex items-start justify-between mb-8">
-                    <div><div className="text-white/70 text-xs uppercase tracking-widest mb-1">Local Rewards</div><div className="text-white font-serif text-xl font-semibold">{business.name}</div></div>
-                    <Badge className="bg-white/20 text-white border-0 text-xs capitalize">{card.tier}</Badge>
+                    <div><div className="text-white/70 text-xs uppercase tracking-widest mb-1">Local Rewards</div><div className="text-white font-serif text-xl font-semibold">{account.merchant.businessName}</div></div>
+                    <Badge className="bg-white/20 text-white border-0 text-xs capitalize">{account.tier}</Badge>
                   </div>
                   <div className="flex items-end justify-between">
-                    <div><div className="text-white/70 text-xs uppercase tracking-widest mb-1">Points Balance</div><div className="text-white text-3xl font-semibold">{card.pointsBalance.toLocaleString()}</div></div>
-                    <div className="text-right"><div className="text-white/70 text-xs uppercase tracking-widest mb-1">Visits</div><div className="text-white text-xl font-semibold">{card.visitCount}</div></div>
+                    <div><div className="text-white/70 text-xs uppercase tracking-widest mb-1">Points Balance</div><div className="text-white text-3xl font-semibold">{account.pointsBalance.toLocaleString()}</div></div>
+                    <div className="text-right"><div className="text-white/70 text-xs uppercase tracking-widest mb-1">Visits</div><div className="text-white text-xl font-semibold">{account.visitCount}</div></div>
                   </div>
                   <div className="mt-4">
                     <div className="h-1 bg-white/20 rounded-full overflow-hidden"><div className="h-full bg-white/70 rounded-full transition-all" style={{ width: `${progress}%` }} /></div>
-                    {card.tier !== "platinum" && <div className="text-white/60 text-xs mt-1.5">{(nextTier.needed - card.lifetimePoints).toLocaleString()} pts to {nextTier.next}</div>}
+                    {account.tier !== "platinum" && <div className="text-white/60 text-xs mt-1.5">{(nextTier.needed - account.lifetimePoints).toLocaleString()} pts to {nextTier.next}</div>}
                   </div>
                 </div>
                 <div className="mt-3 flex items-center justify-between px-1">
-                  <div className="text-sm text-muted-foreground">{business.category ?? "Local Business"}</div>
+                  <div className="text-sm text-muted-foreground">{account.merchant.category}</div>
                   <div className="flex items-center gap-1 text-sm text-primary font-medium">View <ArrowRight className="w-3 h-3" /></div>
                 </div>
               </div>

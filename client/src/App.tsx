@@ -24,22 +24,12 @@ import ConsumerDiscover from "./pages/consumer/Discover";
 import ConsumerRedemptions from "./pages/consumer/Redemptions";
 import ConsumerTransactions from "./pages/consumer/Transactions";
 
-// Business pages
-import BusinessDashboard from "./pages/business/Dashboard";
-import BusinessCustomers from "./pages/business/Customers";
-import BusinessOffers from "./pages/business/Offers";
-import BusinessMilestones from "./pages/business/Milestones";
-import BusinessCampaigns from "./pages/business/Campaigns";
-import BusinessSettings from "./pages/business/Settings";
-import BusinessRewards from "./pages/business/Rewards";
-
 // Admin pages
 import AdminDashboard from "./pages/admin/Dashboard";
-import AdminBusinesses from "./pages/admin/Businesses";
-import AdminUsers from "./pages/admin/Users";
+import AdminMerchants from "./pages/admin/Businesses";
 
 // ─── Route Guards ─────────────────────────────────────────────────────────────
-type AllowedRole = "consumer" | "business_owner" | "admin";
+type AllowedRole = "consumer" | "admin";
 
 function ProtectedRoute({
   component: Component,
@@ -57,15 +47,12 @@ function ProtectedRoute({
       window.location.href = getLoginUrl();
       return;
     }
-    if (!user.onboardingComplete) {
+    if (user.role === "unregistered" || user.role === "business_owner") {
       navigate("/onboarding");
       return;
     }
-    if (!allowedRoles.includes(user.role as AllowedRole)) {
-      // Redirect to the correct home for their role
-      if (user.role === "admin") navigate("/admin");
-      else if (user.role === "business_owner") navigate("/business");
-      else navigate("/dashboard");
+    if (!allowedRoles.includes(user.role)) {
+      navigate(user.role === "admin" ? "/admin" : "/dashboard");
     }
   }, [loading, user, navigate]);
 
@@ -82,7 +69,7 @@ function Router() {
       <Route path="/login" component={Login} />
       <Route path="/directory" component={BusinessDirectory} />
 
-      {/* Onboarding — consumer path only; business owners are redirected to magicfishbowl.com */}
+      {/* Onboarding — role detection + MagicFishbowl redirect for business owners */}
       <Route path="/onboarding" component={Onboarding} />
 
       {/* Public business info page */}
@@ -92,7 +79,7 @@ function Router() {
       <Route path="/dashboard">
         {() => <ProtectedRoute component={ConsumerDashboard} allowedRoles={["consumer"]} />}
       </Route>
-      <Route path="/card/:businessId">
+      <Route path="/card/:merchantId">
         {() => <ProtectedRoute component={ConsumerCard} allowedRoles={["consumer"]} />}
       </Route>
       <Route path="/discover">
@@ -105,38 +92,12 @@ function Router() {
         {() => <ProtectedRoute component={ConsumerTransactions} allowedRoles={["consumer"]} />}
       </Route>
 
-      {/* Business — only accessible to business_owner */}
-      <Route path="/business">
-        {() => <ProtectedRoute component={BusinessDashboard} allowedRoles={["business_owner"]} />}
-      </Route>
-      <Route path="/business/customers">
-        {() => <ProtectedRoute component={BusinessCustomers} allowedRoles={["business_owner"]} />}
-      </Route>
-      <Route path="/business/offers">
-        {() => <ProtectedRoute component={BusinessOffers} allowedRoles={["business_owner"]} />}
-      </Route>
-      <Route path="/business/rewards">
-        {() => <ProtectedRoute component={BusinessRewards} allowedRoles={["business_owner"]} />}
-      </Route>
-      <Route path="/business/milestones">
-        {() => <ProtectedRoute component={BusinessMilestones} allowedRoles={["business_owner"]} />}
-      </Route>
-      <Route path="/business/campaigns">
-        {() => <ProtectedRoute component={BusinessCampaigns} allowedRoles={["business_owner"]} />}
-      </Route>
-      <Route path="/business/settings">
-        {() => <ProtectedRoute component={BusinessSettings} allowedRoles={["business_owner"]} />}
-      </Route>
-
       {/* Admin — only accessible to admin */}
       <Route path="/admin">
         {() => <ProtectedRoute component={AdminDashboard} allowedRoles={["admin"]} />}
       </Route>
       <Route path="/admin/businesses">
-        {() => <ProtectedRoute component={AdminBusinesses} allowedRoles={["admin"]} />}
-      </Route>
-      <Route path="/admin/users">
-        {() => <ProtectedRoute component={AdminUsers} allowedRoles={["admin"]} />}
+        {() => <ProtectedRoute component={AdminMerchants} allowedRoles={["admin"]} />}
       </Route>
 
       <Route path="/404" component={NotFound} />

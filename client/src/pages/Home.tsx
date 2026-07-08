@@ -19,14 +19,12 @@ export default function Home() {
 
   useEffect(() => {
     if (!loading && isAuthenticated && user) {
-      if (!user.onboardingComplete) {
-        navigate("/onboarding");
-      } else if (user.role === "admin") {
+      if (user.role === "admin") {
         navigate("/admin");
-      } else if (user.role === "business_owner") {
-        navigate("/business");
-      } else {
+      } else if (user.role === "consumer") {
         navigate("/dashboard");
+      } else {
+        navigate("/onboarding");
       }
     }
   }, [loading, isAuthenticated, user, navigate]);
