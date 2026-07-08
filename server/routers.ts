@@ -49,14 +49,20 @@ const consumerRouter = router({
       return db.getPointsLedgerByAccount(input.loyaltyAccountId);
     }),
 
-  getAvailableOffers: protectedProcedure
+  getAvailableOffers: publicProcedure
     .input(z.object({ merchantId: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
-      const member = requireMember(ctx.user);
-      const accounts = await db.getLoyaltyAccountsByMember(member.id);
-      const account = accounts.find((a) => a.merchantId === input.merchantId);
+      // Offers are public - anyone can view what's available at a business
       const offers = await db.getActiveOffersByMerchant(input.merchantId);
-      return { offers, account: account ?? null };
+
+      // But loyalty account info is only for signed-in members
+      let account = null;
+      if (ctx.user?.member) {
+        const accounts = await db.getLoyaltyAccountsByMember(ctx.user.member.id);
+        account = accounts.find((a) => a.merchantId === input.merchantId) ?? null;
+      }
+
+      return { offers, account };
     }),
 
   getRedemptions: protectedProcedure.query(async ({ ctx }) => {
