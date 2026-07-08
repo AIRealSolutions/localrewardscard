@@ -24,7 +24,6 @@ export default function ConsumerCard() {
 
   if (isLoading) return <AppLayout title="Loyalty Card"><Skeleton className="h-64 rounded-2xl" /></AppLayout>;
   if (!merchant && data?.offers) {
-    const offerMerchantName = data.offers[0]?.id ? "Business" : "";
     return (
       <AppLayout title="Business Offers">
         <div className="max-w-md mx-auto">
@@ -33,7 +32,7 @@ export default function ConsumerCard() {
           </Button>
           <div className="bg-card rounded-2xl border border-border p-6 mb-8">
             <h2 className="font-serif text-2xl font-semibold text-foreground mb-2">Available Offers</h2>
-            <p className="text-muted-foreground text-sm">Sign up on MagicFishbowl to earn points when you use these offers.</p>
+            <p className="text-muted-foreground text-sm">Create an account to redeem these exclusive offers.</p>
           </div>
           <div>
             {data.offers && data.offers.length > 0 ? (
@@ -53,9 +52,9 @@ export default function ConsumerCard() {
             ) : (
               <div className="text-center py-10 bg-card rounded-2xl border border-border text-muted-foreground mb-8">No active offers right now.</div>
             )}
-            <Button asChild variant="outline" className="w-full rounded-full gap-2">
-              <a href="https://magicfishbowl.com" target="_blank" rel="noopener noreferrer">
-                Join MagicFishbowl <ExternalLink className="w-3.5 h-3.5" />
+            <Button asChild className="w-full rounded-full gap-2">
+              <a href="https://magicfishbowl.com/join" target="_blank" rel="noopener noreferrer">
+                Accept Offer & Register <ExternalLink className="w-3.5 h-3.5" />
               </a>
             </Button>
           </div>
