@@ -5,7 +5,9 @@ import { useEffect } from "react";
 import { Star, Store, ExternalLink, User } from "lucide-react";
 
 const MAGICFISHBOWL_JOIN_URL = "https://magicfishbowl.com/join";
-const MAGICFISHBOWL_BIZ_URL = "https://magicfishbowl.com/biz";
+// This user already has a merchants row (see role resolution in server/_core/auth.ts),
+// so send them to login, not the default signup form at /biz.
+const MAGICFISHBOWL_BIZ_LOGIN_URL = "https://magicfishbowl.com/biz?login=1";
 
 export default function Onboarding() {
   const { user, loading } = useAuth();
@@ -43,7 +45,7 @@ export default function Onboarding() {
               staff, campaigns, billing — lives on MagicFishbowl.
             </p>
             <Button asChild size="lg" className="rounded-full h-12 text-base font-semibold">
-              <a href={MAGICFISHBOWL_BIZ_URL} target="_blank" rel="noopener noreferrer">
+              <a href={MAGICFISHBOWL_BIZ_LOGIN_URL} target="_blank" rel="noopener noreferrer">
                 Go to MagicFishbowl <ExternalLink className="ml-2 w-4 h-4" />
               </a>
             </Button>

@@ -8,7 +8,7 @@ import {
 import { useLocation } from "wouter";
 
 const MAGICFISHBOWL_URL = "https://magicfishbowl.com";
-const MAGICFISHBOWL_ENROLL_URL = "https://magicfishbowl.com/enroll";
+const MAGICFISHBOWL_ENROLL_URL = "https://magicfishbowl.com/biz";
 
 const features = [
   {

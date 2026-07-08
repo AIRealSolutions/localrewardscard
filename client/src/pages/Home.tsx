@@ -11,6 +11,7 @@ import {
 import { useEffect } from "react";
 
 const MAGICFISHBOWL_URL = "https://magicfishbowl.com";
+const MAGICFISHBOWL_ENROLL_URL = "https://magicfishbowl.com/biz";
 
 export default function Home() {
   useDocumentTitle("Local Rewards — Free Loyalty Card for Local Businesses");
@@ -298,7 +299,7 @@ export default function Home() {
                 </a>
               </Button>
               <Button asChild size="lg" variant="outline" className="rounded-full px-8 h-12 text-base border-primary-foreground/30 text-primary-foreground hover:bg-primary-foreground/10">
-                <a href={MAGICFISHBOWL_URL} target="_blank" rel="noopener noreferrer">
+                <a href={MAGICFISHBOWL_ENROLL_URL} target="_blank" rel="noopener noreferrer">
                   Enroll on MagicFishbowl <ExternalLink className="ml-2 w-4 h-4" />
                 </a>
               </Button>
