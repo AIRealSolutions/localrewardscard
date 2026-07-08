@@ -1,4 +1,4 @@
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, or, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import {
@@ -88,7 +88,7 @@ export async function getLiveMerchants(limit = 50, offset = 0): Promise<Merchant
   return db
     .select()
     .from(merchants)
-    .where(eq(merchants.isLive, true))
+    .where(or(eq(merchants.isLive, true), eq(merchants.subscriptionStatus, 'active')))
     .limit(limit)
     .offset(offset)
     .orderBy(desc(merchants.createdAt));
