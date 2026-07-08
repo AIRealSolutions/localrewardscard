@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { supabase } from "@/lib/supabase";
 import { Star, ArrowRight, Mail } from "lucide-react";
 import { useState } from "react";
@@ -9,6 +10,7 @@ import { toast } from "sonner";
 type Mode = "sign-in" | "sign-up";
 
 export default function Login() {
+  useDocumentTitle("Sign In | Local Rewards");
   const [mode, setMode] = useState<Mode>("sign-in");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
