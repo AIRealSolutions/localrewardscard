@@ -18,13 +18,54 @@ export default function ConsumerCard() {
   const { user } = useAuth();
   const [, navigate] = useLocation();
   const { data, isLoading } = trpc.consumer.getAvailableOffers.useQuery({ merchantId }, { enabled: !!merchantId });
-  const { data: accounts } = trpc.consumer.getMyCards.useQuery();
+  const { data: accounts } = trpc.consumer.getMyCards.useQuery({ enabled: !!user?.member });
   const accountData = accounts?.find(a => a.merchant?.id === merchantId);
+  const merchant = accountData?.merchant;
 
   if (isLoading) return <AppLayout title="Loyalty Card"><Skeleton className="h-64 rounded-2xl" /></AppLayout>;
-  if (!accountData?.merchant) return <AppLayout title="Loyalty Card"><div className="text-center py-20 text-muted-foreground">Card not found.</div></AppLayout>;
+  if (!merchant && data?.offers) {
+    const offerMerchantName = data.offers[0]?.id ? "Business" : "";
+    return (
+      <AppLayout title="Business Offers">
+        <div className="max-w-md mx-auto">
+          <Button variant="ghost" size="sm" className="mb-6 -ml-2" onClick={() => navigate("/dashboard")}>
+            <ArrowLeft className="w-4 h-4 mr-1.5" /> Back
+          </Button>
+          <div className="bg-card rounded-2xl border border-border p-6 mb-8">
+            <h2 className="font-serif text-2xl font-semibold text-foreground mb-2">Available Offers</h2>
+            <p className="text-muted-foreground text-sm">Sign up on MagicFishbowl to earn points when you use these offers.</p>
+          </div>
+          <div>
+            {data.offers && data.offers.length > 0 ? (
+              <div className="space-y-3 mb-8">
+                {data.offers.map(offer => (
+                  <div key={offer.id} className="bg-card rounded-2xl border border-border p-5 flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-xl bg-primary/10 text-primary flex items-center justify-center flex-shrink-0">
+                      <Gift className="w-6 h-6" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-semibold text-foreground">{offer.title}</div>
+                      <div className="text-sm text-muted-foreground">{offer.description}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-10 bg-card rounded-2xl border border-border text-muted-foreground mb-8">No active offers right now.</div>
+            )}
+            <Button asChild variant="outline" className="w-full rounded-full gap-2">
+              <a href="https://magicfishbowl.com" target="_blank" rel="noopener noreferrer">
+                Join MagicFishbowl <ExternalLink className="w-3.5 h-3.5" />
+              </a>
+            </Button>
+          </div>
+        </div>
+      </AppLayout>
+    );
+  }
+  if (!merchant) return <AppLayout title="Loyalty Card"><div className="text-center py-20 text-muted-foreground">Card not found.</div></AppLayout>;
 
-  const { merchant, ...account } = accountData;
+  const { ...account } = accountData;
   const tierColor = TIER_COLORS[account.tier] ?? "card-bronze";
 
   return (
