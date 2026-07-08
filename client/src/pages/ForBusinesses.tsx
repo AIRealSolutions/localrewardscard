@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import {
   ArrowRight, Star, Users, Mail, Phone, Share2,
   BarChart3, Gift, TrendingUp, CheckCircle, ExternalLink, MapPin
@@ -60,6 +61,7 @@ const steps = [
 ];
 
 export default function ForBusinesses() {
+  useDocumentTitle("For Businesses — Build Customer Loyalty | Local Rewards");
   const [, navigate] = useLocation();
 
   return (

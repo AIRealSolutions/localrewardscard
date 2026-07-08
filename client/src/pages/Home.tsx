@@ -2,6 +2,7 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { getLoginUrl } from "@/const";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useLocation } from "wouter";
 import {
   ArrowRight, Star, Gift, TrendingUp, MapPin, CheckCircle,
@@ -12,6 +13,7 @@ import { useEffect } from "react";
 const MAGICFISHBOWL_URL = "https://magicfishbowl.com";
 
 export default function Home() {
+  useDocumentTitle("Local Rewards — Free Loyalty Card for Local Businesses");
   const { user, loading, isAuthenticated } = useAuth();
   const [, navigate] = useLocation();
 

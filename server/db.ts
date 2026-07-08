@@ -1,5 +1,6 @@
-import { and, desc, eq, like, sql } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/mysql2";
+import { and, desc, eq, sql } from "drizzle-orm";
+import { drizzle } from "drizzle-orm/postgres-js";
+import postgres from "postgres";
 import {
   AccrualRule,
   Business,
@@ -37,7 +38,8 @@ let _db: ReturnType<typeof drizzle> | null = null;
 export async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
     try {
-      _db = drizzle(process.env.DATABASE_URL);
+      const client = postgres(process.env.DATABASE_URL, { prepare: false });
+      _db = drizzle(client);
     } catch (error) {
       console.warn("[Database] Failed to connect:", error);
       _db = null;
@@ -72,14 +74,14 @@ export async function upsertUser(user: InsertUser): Promise<void> {
   if (user.role !== undefined) {
     values.role = user.role;
     updateSet.role = user.role;
-  } else if (user.openId === ENV.ownerOpenId) {
+  } else if (ENV.ownerEmail && user.email === ENV.ownerEmail) {
     values.role = "admin";
     updateSet.role = "admin";
   }
   if (!values.lastSignedIn) values.lastSignedIn = new Date();
   if (Object.keys(updateSet).length === 0) updateSet.lastSignedIn = new Date();
 
-  await db.insert(users).values(values).onDuplicateKeyUpdate({ set: updateSet });
+  await db.insert(users).values(values).onConflictDoUpdate({ target: users.openId, set: updateSet });
 }
 
 export async function getUserByOpenId(openId: string): Promise<User | undefined> {
@@ -109,8 +111,8 @@ export async function getAllUsers(limit = 100, offset = 0): Promise<User[]> {
 export async function createBusiness(data: InsertBusiness): Promise<number> {
   const db = await getDb();
   if (!db) throw new Error("DB unavailable");
-  const result = await db.insert(businesses).values(data);
-  return (result[0] as { insertId: number }).insertId;
+  const [row] = await db.insert(businesses).values(data).returning({ id: businesses.id });
+  return row!.id;
 }
 
 export async function getBusinessById(id: number): Promise<Business | undefined> {
@@ -172,10 +174,8 @@ export async function getOrCreateLoyaltyCard(consumerId: number, businessId: num
   if (existing[0]) return existing[0];
 
   const cardNumber = `LR-${Date.now()}-${Math.floor(Math.random() * 9999).toString().padStart(4, "0")}`;
-  const result = await db.insert(loyaltyCards).values({ consumerId, businessId, cardNumber });
-  const insertId = (result[0] as { insertId: number }).insertId;
-  const created = await db.select().from(loyaltyCards).where(eq(loyaltyCards.id, insertId)).limit(1);
-  return created[0]!;
+  const [created] = await db.insert(loyaltyCards).values({ consumerId, businessId, cardNumber }).returning();
+  return created!;
 }
 
 export async function getLoyaltyCardsByConsumer(consumerId: number): Promise<LoyaltyCard[]> {
@@ -231,8 +231,8 @@ export async function getTransactionsByBusiness(businessId: number, limit = 100)
 export async function createRewardsOffer(data: InsertRewardsOffer): Promise<number> {
   const db = await getDb();
   if (!db) throw new Error("DB unavailable");
-  const result = await db.insert(rewardsOffers).values(data);
-  return (result[0] as { insertId: number }).insertId;
+  const [row] = await db.insert(rewardsOffers).values(data).returning({ id: rewardsOffers.id });
+  return row!.id;
 }
 
 export async function getOffersByBusiness(businessId: number): Promise<RewardsOffer[]> {
@@ -273,8 +273,8 @@ export async function getMilestonesByBusiness(businessId: number): Promise<Patro
 export async function createMilestone(data: InsertPatronageMilestone): Promise<number> {
   const db = await getDb();
   if (!db) throw new Error("DB unavailable");
-  const result = await db.insert(patronageMilestones).values(data);
-  return (result[0] as { insertId: number }).insertId;
+  const [row] = await db.insert(patronageMilestones).values(data).returning({ id: patronageMilestones.id });
+  return row!.id;
 }
 
 export async function deleteMilestone(id: number): Promise<void> {
@@ -288,8 +288,8 @@ export async function deleteMilestone(id: number): Promise<void> {
 export async function createRedemption(data: InsertRedemption): Promise<number> {
   const db = await getDb();
   if (!db) throw new Error("DB unavailable");
-  const result = await db.insert(redemptions).values(data);
-  return (result[0] as { insertId: number }).insertId;
+  const [row] = await db.insert(redemptions).values(data).returning({ id: redemptions.id });
+  return row!.id;
 }
 
 export async function getRedemptionsByConsumer(consumerId: number): Promise<Redemption[]> {
@@ -323,8 +323,8 @@ export async function updateRedemption(id: number, data: Partial<InsertRedemptio
 export async function createCampaign(data: InsertCampaign): Promise<number> {
   const db = await getDb();
   if (!db) throw new Error("DB unavailable");
-  const result = await db.insert(campaigns).values(data);
-  return (result[0] as { insertId: number }).insertId;
+  const [row] = await db.insert(campaigns).values(data).returning({ id: campaigns.id });
+  return row!.id;
 }
 
 export async function getCampaignsByBusiness(businessId: number): Promise<Campaign[]> {
@@ -355,7 +355,7 @@ export async function getAccrualRule(businessId: number): Promise<AccrualRule | 
 export async function upsertAccrualRule(data: InsertAccrualRule): Promise<void> {
   const db = await getDb();
   if (!db) return;
-  await db.insert(accrualRules).values(data).onDuplicateKeyUpdate({ set: data });
+  await db.insert(accrualRules).values(data).onConflictDoUpdate({ target: accrualRules.businessId, set: data });
 }
 
 // ─── Platform Analytics ───────────────────────────────────────────────────────

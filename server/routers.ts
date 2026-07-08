@@ -1,8 +1,6 @@
 import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
 import { z } from "zod";
-import { COOKIE_NAME } from "@shared/const";
-import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import * as db from "./db";
@@ -10,9 +8,8 @@ import * as db from "./db";
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 const authRouter = router({
   me: publicProcedure.query((opts) => opts.ctx.user),
-  logout: publicProcedure.mutation(({ ctx }) => {
-    const cookieOptions = getSessionCookieOptions(ctx.req);
-    ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
+  logout: publicProcedure.mutation(() => {
+    // Session is managed client-side by Supabase; nothing to invalidate server-side.
     return { success: true } as const;
   }),
   completeOnboarding: protectedProcedure
