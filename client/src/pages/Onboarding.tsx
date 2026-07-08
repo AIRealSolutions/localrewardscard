@@ -4,9 +4,9 @@ import { useLocation } from "wouter";
 import { useEffect } from "react";
 import { Star, Store, ExternalLink, User } from "lucide-react";
 
-const MAGICFISHBOWL_JOIN_URL = "https://magicfishbowl.com/join";
-// This user already has a merchants row (see role resolution in server/_core/auth.ts),
-// so send them to login, not the default signup form at /biz.
+// New users (no merchants row) go to /biz which shows signup form by default
+const MAGICFISHBOWL_SIGNUP_URL = "https://magicfishbowl.com/biz";
+// Existing business owners (have merchants row) go to login
 const MAGICFISHBOWL_BIZ_LOGIN_URL = "https://magicfishbowl.com/biz?login=1";
 
 export default function Onboarding() {
@@ -58,7 +58,7 @@ export default function Onboarding() {
               minute — and you'll be able to sign in here right away.
             </p>
             <Button asChild size="lg" className="rounded-full h-12 text-base font-semibold">
-              <a href={MAGICFISHBOWL_JOIN_URL} target="_blank" rel="noopener noreferrer">
+              <a href={MAGICFISHBOWL_SIGNUP_URL} target="_blank" rel="noopener noreferrer">
                 Join on MagicFishbowl <ExternalLink className="ml-2 w-4 h-4" />
               </a>
             </Button>
