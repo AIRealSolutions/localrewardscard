@@ -85,10 +85,11 @@ export async function getMerchantById(id: string): Promise<Merchant | undefined>
 export async function getLiveMerchants(limit = 50, offset = 0): Promise<Merchant[]> {
   const db = await getDb();
   if (!db) return [];
+  // Show merchants that aren't canceled (include active, trialing, or is_live marked)
   return db
     .select()
     .from(merchants)
-    .where(or(eq(merchants.isLive, true), eq(merchants.subscriptionStatus, 'active')))
+    .where(sql`${merchants.subscriptionStatus} != 'canceled' OR ${merchants.isLive} = true`)
     .limit(limit)
     .offset(offset)
     .orderBy(desc(merchants.createdAt));
